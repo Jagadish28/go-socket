@@ -1,0 +1,13 @@
+create_table("stocks") {
+  t.Column("id", "int", {primary: true})
+  t.Column("symbol", "string")
+  t.Column("underlying", "string")
+  t.Column("token", "int", {"default":0})
+  t.Column("instrument_type", "string", {"default":""})
+  t.Column("expiry", "string", {"default":""})
+  t.Column("strike", "double precision", {"default":0.0})
+  t.Column("price", "double precision", {"default":0.0})
+  t.Column("created_at", "date", {"default":"now()"})
+  t.Column("updated_at", "date", {"default":"now()"})
+
+}

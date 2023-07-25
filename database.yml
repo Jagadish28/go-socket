@@ -1,0 +1,14 @@
+development:
+  create: true
+  dialect: postgres
+  database: sensibull
+  user: postgres
+  password: admin
+  host: localhost  # docker my_postgres
+  pool: 5
+
+ # docker host my_postgres
+ # local host localhost
+
+  # docker database_connection_string postgres://postgres:admin@my_postgres/sensibull?sslmode=disable
+  # local database_connection_string postgres://postgres:admin@localhost/sensibull?sslmode=disable"

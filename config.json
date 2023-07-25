@@ -1,0 +1,16 @@
+{
+    "database_host": "postgres",
+    "database_port": 5432,
+    "database_name": "sensibull",
+    "database_user_name": "postgres",
+    "database_password": "admin",
+    "database_connection_string": "postgres://postgres:admin@localhost/sensibull?sslmode=disable",
+    "database_check_connection_string": "postgres://postgres:admin@localhost/sensibull?sslmode=disable",
+    "app_port": ":19093",
+    "underlyings_api_url": "https://prototype.sbulltech.com/api/underlyings",
+    "derivatives_api_url": "https://prototype.sbulltech.com/api/derivatives/",
+    "web_socket_url": "wss://prototype.sbulltech.com/api/ws",
+    "stock_refresh_poll_seconds": 900,
+    "socket_subscription_poll_seconds": 60,
+    "socket_un_subscription_poll_seconds": 880
+}

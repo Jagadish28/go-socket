@@ -1,0 +1,39 @@
+version: '3.9'
+services:
+  app:
+    container_name: golang_container
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=admin
+      - POSTGRES_DB=sensibull
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+    tty: true
+    build: .
+    ports:
+      - 19093:19093
+    restart: on-failure
+    volumes:
+      - .:/app
+    depends_on:
+      - my_postgres
+    networks:
+      - learning
+
+  my_postgres:
+    image: postgres:latest
+    container_name: postgres_container
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=admin
+      - POSTGRES_DB=sensibull
+      - DATABASE_HOST=postgres
+    ports:
+      - '5432:5432'
+    networks:
+      - learning
+
+# Networks to be created to facilitate communication between containers
+networks:
+  learning:
+    driver: bridge
