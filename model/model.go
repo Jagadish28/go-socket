@@ -29,7 +29,11 @@ type WebSocketRequest struct {
 
 type WebSocketResponse struct {
 	Data_type string         `json:"data_type"`
-	Payload   WebSocketPrice `json:"payload"`
+	Payload   WebSocketPrice `json:"payload,omitempty"`
+}
+
+type WebSocketPingResponse struct {
+	Data_type string         `json:"data_type"`
 }
 
 type WebSocketPrice struct {

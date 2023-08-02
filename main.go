@@ -20,19 +20,19 @@ func main() {
 
 	l := log.New(os.Stdout, "sensibull-api:", log.LstdFlags) // log object to write application logs
 	var AppConfig = config.LoadConfig(l)
-	var ticker = time.NewTicker(time.Second * time.Duration(AppConfig.StockRefreshSeconds))
+	// var ticker = time.NewTicker(time.Second * time.Duration(AppConfig.StockRefreshSeconds))
 
 	utils.DataSetup(&AppConfig, l)  // creates DB if not exists, checks for connection, runs migration to create tables and store initial data
 	c := utils.DialTOWS(&AppConfig) // connect to websocket and returns connection object
 	utils.StockRefresh(&AppConfig, c, l)
-	go func() {
-		// As per the stock_refresh_poll_seconds mentioned in config.json, this function will execute for every mentioned seconds
-		for range ticker.C {
-			l.Println("Refreshing Stocks...")
-			c := utils.DialTOWS(&AppConfig)
-			utils.StockRefresh(&AppConfig, c, l)
-		}
-	}()
+	// go func() {
+	// 	// As per the stock_refresh_poll_seconds mentioned in config.json, this function will execute for every mentioned seconds
+	// 	for range ticker.C {
+	// 		l.Println("Refreshing Stocks...")
+	// 		c := utils.DialTOWS(&AppConfig)
+	// 		utils.StockRefresh(&AppConfig, c, l)
+	// 	}
+	// }()
 
 	ph := handler.NewRequestHandler(l, &AppConfig)
 	sm := mux.NewRouter()

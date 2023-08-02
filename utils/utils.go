@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"sensibull/config"
-	"time"
 
 	"github.com/gorilla/websocket"
 	_ "github.com/lib/pq"
@@ -87,18 +86,18 @@ func runMigrations(l *log.Logger) {
 // stockRefresh clears current stocks in stockt table, fetch fresh underlyings and its derivatives and get the list of new tokens to subscribe
 func StockRefresh(config *config.AppConfig, conn *websocket.Conn, l *log.Logger) {
 	subCh := make(chan []int)
-	go LoadInitialStocks(config, subCh, l)
-	go func() {
-		for {
-			select {
-			case tokensToSubscribe = <-subCh:
-				err := SubscribeToWebsocket(config, conn, tokensToSubscribe, l)
-				if err != nil {
-					l.Println("Error while subscribing:", err)
-				}
-			default:
-				time.Sleep(1 * time.Second) // to avoid busy-waiting.
-			}
-		}
-	}()
+	go LoadInitialStocks(conn, config, subCh, l)
+	// go func() {
+	// 	for {
+	// 		select {
+	// 		case tokensToSubscribe = <-subCh:
+	// 			err := SubscribeToWebsocket(config, conn, tokensToSubscribe, l)
+	// 			if err != nil {
+	// 				l.Println("Error while subscribing:", err)
+	// 			}
+	// 		default:
+	// 			time.Sleep(1 * time.Second) // to avoid busy-waiting.
+	// 		}
+	// 	}
+	// }()
 }

@@ -3,6 +3,7 @@ package utils
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"sensibull/config"
 	"sensibull/model"
@@ -31,7 +32,7 @@ func clearStocks(config *config.AppConfig, l *log.Logger) {
 }
 
 // LoadInitialStocks hits the broker api and save it to DB and with the token list It'll trigger fetch derivatives
-func LoadInitialStocks(config *config.AppConfig, stopCh chan []int, l *log.Logger) {
+func LoadInitialStocks(conn *websocket.Conn, config *config.AppConfig, stopCh chan []int, l *log.Logger) {
 	clearStocks(config, l) // clears current stocks
 	db, err := sql.Open(config.DatabaseHost, config.DataBaseConnectionString)
 	if err != nil {
@@ -63,7 +64,7 @@ func LoadInitialStocks(config *config.AppConfig, stopCh chan []int, l *log.Logge
 		underLyingTokens = append(underLyingTokens, newStock.Token)
 
 	}
-	loadInitialDerivatives(config, underLyingTokens, stopCh, l)
+	loadInitialDerivatives(conn, config, underLyingTokens, stopCh, l)
 
 }
 
@@ -77,7 +78,7 @@ func ConnectDB(config *config.AppConfig) (*sql.DB, error) {
 }
 
 // loadInitialDerivatives will load the list of derivatives from Broker API and sent token list for subscription
-func loadInitialDerivatives(config *config.AppConfig, tokens []int, stopCh chan []int, l *log.Logger) {
+func loadInitialDerivatives(conn *websocket.Conn, config *config.AppConfig, tokens []int, stopCh chan []int, l *log.Logger) {
 	db, err := sql.Open(config.DatabaseHost, config.DataBaseConnectionString)
 	if err != nil {
 		log.Fatal(err)
@@ -107,10 +108,12 @@ func loadInitialDerivatives(config *config.AppConfig, tokens []int, stopCh chan 
 				log.Fatal(err)
 			}
 			underLyingTokens = append(underLyingTokens, newStock.Token)
+
 		}
 	}
 	// sends message to the channel with list of token
-	stopCh <- underLyingTokens
+	getPrice(config, conn, underLyingTokens, l)
+	// stopCh <- underLyingTokens
 }
 
 func saveStockPrice(config *config.AppConfig, token int, price float64, l *log.Logger) error {
@@ -160,7 +163,7 @@ func SubscribeToWebsocket(conf *config.AppConfig, c *websocket.Conn, tokens []in
 	if err != nil {
 		l.Println("WebSocket write error:", err)
 	} else {
-		l.Println("Subscribe Message sent successfully!")
+		l.Println("Subscribe Message sent successfully!---->", requestJSON)
 	}
 
 	// Based on the configured unsubscription polling time, we are un-subscribing the current list of tokens
@@ -243,4 +246,116 @@ func DialTOWS(config *config.AppConfig) *websocket.Conn {
 		log.Fatal("WebSocket dial error:", err)
 	}
 	return c
+}
+
+func getPrice(config *config.AppConfig, conn *websocket.Conn, tokens []int, l *log.Logger) error {
+
+	for token := range tokens {
+
+		fmt.Println("token---->", tokens[token])
+		request := model.WebSocketRequest{
+			Msg_Command: "subscribe",
+			Data_Type:   "quote",
+			Tokens:      []int{tokens[token]},
+		}
+		fmt.Println("request---->", request)
+
+		requestJSON, err := json.Marshal(request)
+		if err != nil {
+			l.Println("Error encoding JSON request:", err)
+			return err
+		}
+
+		err = conn.WriteMessage(websocket.TextMessage, requestJSON)
+		if err != nil {
+			l.Println("WebSocket write error:", err)
+		} else {
+			l.Println("Subscribe Message sent successfully!---->", string(requestJSON))
+		}
+
+		ReadMessage(conn, tokens[token], config, l)
+
+	}
+
+	return nil
+
+}
+
+func ReadMessage(conn *websocket.Conn, token int, config *config.AppConfig, l *log.Logger) {
+	_, response, err := conn.ReadMessage()
+	if err != nil {
+		l.Println("WebSocket read error:", err)
+	}
+
+	// Process the received response
+	var websocketResponse model.WebSocketResponse
+	var websocketPingResponse model.WebSocketPingResponse
+
+	err = json.Unmarshal([]byte(response), &websocketResponse)
+	fmt.Println("response--->", string(response))
+
+	if err != nil {
+		err = json.Unmarshal([]byte(response), &websocketPingResponse)
+		if err != nil {
+			l.Println("Error parsing Websocket response:", err)
+		}
+		if websocketPingResponse.Data_type == "ping" {
+			l.Println("ping message received")
+		}
+
+		// when the ping message received call the same method again for actual subscription price
+		ReadMessage(conn, token, config, l)
+
+	} else {
+		l.Println("Message Received!", websocketResponse)
+
+		err := saveStockPrice(config, websocketResponse.Payload.Token, websocketResponse.Payload.Price, l)
+		if err != nil {
+			l.Println("Error while saving stock price:", err)
+		}
+		err = unSubscribePrices(conn, token, l)
+		if err != nil {
+			l.Println("Error while unsubscribe:", err)
+		}
+		// readResponseAndSave(conn, config, websocketResponse, l, tokens[token])
+
+	}
+}
+
+// func readResponseAndSave(conn *websocket.Conn, config *config.AppConfig, websocketResponse model.WebSocketResponse, l *log.Logger, token int) {
+// 	l.Println("Message Received!", websocketResponse)
+
+// 	err := saveStockPrice(config, websocketResponse.Payload.Token, websocketResponse.Payload.Price, l)
+// 	if err != nil {
+// 		l.Println("Error while saving stock price:", err)
+// 	}
+// 	err = unSubscribePrices(conn, token, l)
+// 	if err != nil {
+// 		l.Println("Error while unsubscribe:", err)
+// 	}
+// }
+
+func unSubscribePrices(conn *websocket.Conn, token int, l *log.Logger) error {
+	l.Println("Unsubscribe Triggered.....")
+	request := model.WebSocketRequest{
+		Msg_Command: "unsubscribe",
+		Data_Type:   "quote",
+		Tokens:      []int{token},
+	}
+
+	requestJSON, err := json.Marshal(request)
+	if err != nil {
+		l.Println("Error encoding JSON request:", err)
+		return err
+	}
+	err = conn.WriteMessage(websocket.TextMessage, requestJSON)
+	if err != nil {
+		l.Println("WebSocket write error:", err)
+
+	} else {
+		l.Println("Unsubscribe Message sent successfully!", string(requestJSON))
+	}
+	// defer conn.Close()
+	return nil
+
 }
