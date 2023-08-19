@@ -32,7 +32,7 @@ func clearStocks(config *config.AppConfig, l *log.Logger) {
 }
 
 // LoadInitialStocks hits the broker api and save it to DB and with the token list It'll trigger fetch derivatives
-func LoadInitialStocks(conn *websocket.Conn, config *config.AppConfig, stopCh chan []int, l *log.Logger) {
+func LoadInitialStocks(conn *websocket.Conn, config *config.AppConfig, stopCh chan []int, l *log.Logger, done chan<- string) {
 	clearStocks(config, l) // clears current stocks
 	db, err := sql.Open(config.DatabaseHost, config.DataBaseConnectionString)
 	if err != nil {
@@ -64,7 +64,7 @@ func LoadInitialStocks(conn *websocket.Conn, config *config.AppConfig, stopCh ch
 		underLyingTokens = append(underLyingTokens, newStock.Token)
 
 	}
-	loadInitialDerivatives(conn, config, underLyingTokens, stopCh, l)
+	loadInitialDerivatives(conn, config, underLyingTokens, stopCh, l, done)
 
 }
 
@@ -78,7 +78,7 @@ func ConnectDB(config *config.AppConfig) (*sql.DB, error) {
 }
 
 // loadInitialDerivatives will load the list of derivatives from Broker API and sent token list for subscription
-func loadInitialDerivatives(conn *websocket.Conn, config *config.AppConfig, tokens []int, stopCh chan []int, l *log.Logger) {
+func loadInitialDerivatives(conn *websocket.Conn, config *config.AppConfig, tokens []int, stopCh chan []int, l *log.Logger, done chan<- string) {
 	db, err := sql.Open(config.DatabaseHost, config.DataBaseConnectionString)
 	if err != nil {
 		log.Fatal(err)
@@ -112,7 +112,7 @@ func loadInitialDerivatives(conn *websocket.Conn, config *config.AppConfig, toke
 		}
 	}
 	// sends message to the channel with list of token
-	getPrice(config, conn, underLyingTokens, l)
+	getPrice(config, conn, underLyingTokens, l, done)
 	// stopCh <- underLyingTokens
 }
 
@@ -248,7 +248,7 @@ func DialTOWS(config *config.AppConfig) *websocket.Conn {
 	return c
 }
 
-func getPrice(config *config.AppConfig, conn *websocket.Conn, tokens []int, l *log.Logger) error {
+func getPrice(config *config.AppConfig, conn *websocket.Conn, tokens []int, l *log.Logger, done chan<- string) error {
 
 	for token := range tokens {
 
@@ -276,6 +276,8 @@ func getPrice(config *config.AppConfig, conn *websocket.Conn, tokens []int, l *l
 		ReadMessage(conn, tokens[token], config, l)
 
 	}
+	defer conn.Close()
+	done <- "initial stocks fetched"
 
 	return nil
 
@@ -358,4 +360,23 @@ func unSubscribePrices(conn *websocket.Conn, token int, l *log.Logger) error {
 	// defer conn.Close()
 	return nil
 
+}
+
+func GetDerivativeTokens(config *config.AppConfig, l *log.Logger) (error, []int) {
+	db, err := ConnectDB(config)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+	query := "SELECT ARRAY(SELECT token from stocks where instrument_type <> 'EQ') AS tokens; "
+	rows, err := db.Query(query)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer rows.Close()
+	fmt.Println("rows-->", rows)
+
+	return nil, nil
 }

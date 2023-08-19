@@ -10,7 +10,7 @@
     "underlyings_api_url": "https://prototype.sbulltech.com/api/underlyings",
     "derivatives_api_url": "https://prototype.sbulltech.com/api/derivatives/",
     "web_socket_url": "wss://prototype.sbulltech.com/api/ws",
-    "stock_refresh_poll_seconds": 900,
+    "stock_refresh_poll_seconds": 300,
     "socket_subscription_poll_seconds": 60,
     "socket_un_subscription_poll_seconds": 880
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -20,11 +21,16 @@ func main() {
 
 	l := log.New(os.Stdout, "sensibull-api:", log.LstdFlags) // log object to write application logs
 	var AppConfig = config.LoadConfig(l)
+	done := make(chan string)
 	// var ticker = time.NewTicker(time.Second * time.Duration(AppConfig.StockRefreshSeconds))
+	// var ticker2 = time.NewTicker(time.Second * time.Duration(AppConfig.StockSubscribeSeconds))
 
 	utils.DataSetup(&AppConfig, l)  // creates DB if not exists, checks for connection, runs migration to create tables and store initial data
 	c := utils.DialTOWS(&AppConfig) // connect to websocket and returns connection object
-	utils.StockRefresh(&AppConfig, c, l)
+	go utils.StockRefresh(&AppConfig, c, l, done)
+
+	// Perform the action after receiving the response
+
 	// go func() {
 	// 	// As per the stock_refresh_poll_seconds mentioned in config.json, this function will execute for every mentioned seconds
 	// 	for range ticker.C {
@@ -34,6 +40,14 @@ func main() {
 	// 	}
 	// }()
 
+	// go func() {
+	// 	// As per the stock_refresh_poll_seconds mentioned in config.json, this function will execute for every mentioned seconds
+	// 	for range ticker2.C {
+	// 		l.Println("Refreshing Stocks...")
+	// 		c := utils.DialTOWS(&AppConfig)
+	// 		utils.DerivativeRefresh(&AppConfig, c, l)
+	// 	}
+	// }()
 	ph := handler.NewRequestHandler(l, &AppConfig)
 	sm := mux.NewRouter()
 
@@ -48,14 +62,31 @@ func main() {
 		ReadTimeout:  1 * time.Second,
 		WriteTimeout: 1 * time.Second,
 	}
-	go func() {
-		err := s.ListenAndServe()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}()
+	response := <-done
+	fmt.Println("Stock refresh message received so starting server", response)
+	fmt.Println("Server listening on", AppConfig.AppPort)
 
-	l.Println("Server listening on", AppConfig.AppPort)
+	s.ListenAndServe()
+
+	// if err != nil {
+	// 	fmt.Println("err-->", err)
+	// 	log.Fatal(err)
+	// } else {
+
+	// }
+	// func(done <-chan string) {
+	// 	fmt.Println("called8888")
+	// 	fmt.Println("Stock refresh message received so starting server", response)
+	// 	err := s.ListenAndServe()
+	// 	fmt.Println("Server listening on", AppConfig.AppPort)
+
+	// 	if err != nil {
+	// 		fmt.Println("err-->", err)
+
+	// 		log.Fatal(err)
+	// 	}
+
+	// }(done)
 
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)

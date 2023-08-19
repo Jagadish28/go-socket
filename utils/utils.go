@@ -2,6 +2,7 @@ package utils
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -84,9 +85,9 @@ func runMigrations(l *log.Logger) {
 }
 
 // stockRefresh clears current stocks in stockt table, fetch fresh underlyings and its derivatives and get the list of new tokens to subscribe
-func StockRefresh(config *config.AppConfig, conn *websocket.Conn, l *log.Logger) {
+func StockRefresh(config *config.AppConfig, conn *websocket.Conn, l *log.Logger, done chan<- string) {
 	subCh := make(chan []int)
-	go LoadInitialStocks(conn, config, subCh, l)
+	LoadInitialStocks(conn, config, subCh, l, done)
 	// go func() {
 	// 	for {
 	// 		select {
@@ -100,4 +101,10 @@ func StockRefresh(config *config.AppConfig, conn *websocket.Conn, l *log.Logger)
 	// 		}
 	// 	}
 	// }()
+}
+
+func DerivativeRefresh(config *config.AppConfig, conn *websocket.Conn, l *log.Logger) {
+	derivativeTokens, _ := GetDerivativeTokens(config, l)
+
+	fmt.Println("derivativeTokens", derivativeTokens)
 }
